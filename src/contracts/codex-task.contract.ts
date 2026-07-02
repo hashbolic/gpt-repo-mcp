@@ -4,6 +4,8 @@ import { RepoInputSchema } from "./repo.contract.js";
 
 const NonEmptyStringSchema = z.string().min(1);
 const RepoPathListSchema = z.array(z.string().min(1)).default([]);
+const ApprovalSourceSchema = z.enum(["explicit_user", "auto_policy", "trusted_prompt_artifact_path", "dry_run", "denied"])
+  .describe("Audit marker explaining how the operation was approved or why it was validation-only.");
 const CodexRunIdSchema = z.string()
   .regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,79}$/)
   .describe("Stable repo-local Codex run id. Generated when omitted.");
@@ -44,6 +46,7 @@ export const CodexTaskResultSchema = z.object({
 
 export const CodexTaskWriteResultSchema = CodexTaskResultSchema.extend({
   dry_run: z.boolean(),
+  approval_source: ApprovalSourceSchema.optional(),
   written_paths: z.array(z.string())
 });
 

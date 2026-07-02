@@ -15,6 +15,7 @@ import { CleanupService } from "./cleanup-service.js";
 import { validateRepoPath } from "./path-sandbox.js";
 import { OperationsPolicy } from "./operations-policy.js";
 import { SecretScanner } from "./secret-scanner.js";
+import { evaluateLocalGitApproval } from "./trusted-local-policy.js";
 
 const execFileAsync = promisify(execFile);
 const ALLOWED_ENV_TEMPLATE_PATHS = new Set([
@@ -63,6 +64,7 @@ export class GitOperationsService {
     this.policy.assertStageAllowed(input.paths);
     const headSha = await this.assertExpectedHead(input.expected_head_sha);
     const paths = await this.validateExplicitPaths(input.paths);
+    const approval = evaluateLocalGitApproval("git_stage", { dry_run: input.dry_run });
 
     if (!input.dry_run) {
       await this.git(["add", "--", ...paths]);
@@ -70,10 +72,11 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: input.dry_run ?? false,
+      approval_source: approval.approval_source,
       head_sha: headSha,
       staged_paths: paths,
       skipped: [],
-      warnings: []
+      warnings: approval.warnings
     };
   }
 
@@ -81,6 +84,7 @@ export class GitOperationsService {
     this.policy.assertStageAllowed(input.paths);
     const headSha = await this.assertExpectedHead(input.expected_head_sha);
     const paths = await this.validateExplicitPaths(input.paths);
+    const approval = evaluateLocalGitApproval("git_unstage", { dry_run: input.dry_run });
 
     if (!input.dry_run) {
       await this.git(["restore", "--staged", "--", ...paths]);
@@ -88,10 +92,11 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: input.dry_run ?? false,
+      approval_source: approval.approval_source,
       head_sha: headSha,
       unstaged_paths: paths,
       skipped: [],
-      warnings: []
+      warnings: approval.warnings
     };
   }
 
@@ -99,6 +104,7 @@ export class GitOperationsService {
     this.policy.assertRestoreAllowed(input.paths);
     const headSha = await this.assertExpectedHead(input.expected_head_sha);
     const paths = await this.validateExplicitPaths(input.paths, { scanEnvTemplateContent: false });
+    const approval = evaluateLocalGitApproval("git_restore", { dry_run: input.dry_run });
 
     if (!input.dry_run) {
       await this.git(["restore", "--", ...paths]);
@@ -106,10 +112,11 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: input.dry_run ?? false,
+      approval_source: approval.approval_source,
       head_sha: headSha,
       restored_paths: paths,
       skipped: [],
-      warnings: []
+      warnings: approval.warnings
     };
   }
 
@@ -128,14 +135,16 @@ export class GitOperationsService {
         diagnostics: { actual_paths: actualPaths, expected_paths: expectedPaths }
       });
     }
+    const approval = evaluateLocalGitApproval("git_commit", { dry_run: input.dry_run });
 
     if (input.dry_run) {
       return {
         ok: true,
         dry_run: true,
+        approval_source: approval.approval_source,
         head_before: headBefore,
         committed_paths: actualPaths,
-        warnings: []
+        warnings: approval.warnings
       };
     }
 
@@ -144,11 +153,12 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: false,
+      approval_source: approval.approval_source,
       head_before: headBefore,
       head_after: headAfter,
       commit_sha: headAfter,
       committed_paths: actualPaths,
-      warnings: []
+      warnings: approval.warnings
     };
   }
 
@@ -164,15 +174,17 @@ export class GitOperationsService {
         diagnostics: { actual_paths: preStagedPaths, expected_paths: paths }
       });
     }
+    const approval = evaluateLocalGitApproval("git_stage_commit", { dry_run: input.dry_run });
 
     if (input.dry_run) {
       return {
         ok: true,
         dry_run: true,
+        approval_source: approval.approval_source,
         head_before: headBefore,
         staged_paths: paths,
         committed_paths: paths,
-        warnings: []
+        warnings: approval.warnings
       };
     }
 
@@ -194,6 +206,7 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: false,
+      approval_source: approval.approval_source,
       head_before: headBefore,
       head_after: headAfter,
       commit_sha: headAfter,
@@ -201,7 +214,7 @@ export class GitOperationsService {
       committed_paths: actualPaths,
       remaining_changes: status.remaining_changes,
       clean_after: status.clean_after,
-      warnings: []
+      warnings: approval.warnings
     };
   }
 
@@ -214,6 +227,7 @@ export class GitOperationsService {
     }
 
     const headSha = await this.assertExpectedHead(input.expected_head_sha);
+    const approval = evaluateLocalGitApproval("git_recover", { dry_run: input.dry_run });
     if (unstagePathsInput.length > 0) {
       this.policy.assertStageAllowed(unstagePathsInput);
     }
@@ -244,6 +258,7 @@ export class GitOperationsService {
     return {
       ok: true,
       dry_run: input.dry_run ?? false,
+      approval_source: approval.approval_source,
       head_sha: headSha,
       unstaged_paths: unstagePaths,
       restored_paths: restorePaths,
@@ -251,7 +266,7 @@ export class GitOperationsService {
       skipped: cleanupPreview.skipped,
       remaining_changes: status.remaining_changes,
       clean_after: status.clean_after,
-      warnings: cleanupPreview.warnings
+      warnings: [...approval.warnings, ...cleanupPreview.warnings]
     };
   }
 
