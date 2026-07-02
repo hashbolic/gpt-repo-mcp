@@ -31,6 +31,8 @@ This project is not affiliated with OpenAI, ChatGPT, Anthropic, or the Model Con
 4. ChatGPT reviews the actual git diff and any Codex/Claude result written back into the repo.
 5. ChatGPT recommends the next step: revise, recover, stage, or create a local commit.
 
+For trusted human-supervised local workflows with policy-based prompt artifact writes and local-only stage/commit approval, see [Trusted Local Mode](docs/TRUSTED_LOCAL_MODE.md).
+
 ## Quickstart
 
 ### 1. Install
@@ -242,6 +244,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - [Connection options](docs/CONNECTION_OPTIONS.md)
 - [Tool surface](docs/TOOL_SURFACE.md)
 - [Write workflows](docs/WRITE_WORKFLOWS.md)
+- [Trusted local mode](docs/TRUSTED_LOCAL_MODE.md)
 - [Security model](docs/SECURITY.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
 

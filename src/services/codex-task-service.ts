@@ -2,6 +2,7 @@ import { CodexTaskInputSchema, CodexTaskWriteInputSchema, type CodexTask, type C
 import { FileWriter } from "./file-writer.js";
 import { PathSandbox, validateRepoPath } from "./path-sandbox.js";
 import { WritePolicy } from "./write-policy.js";
+import { evaluatePromptArtifactWrite, type ApprovalSource } from "./trusted-local-policy.js";
 
 const CODEX_RUN_DIR = ".chatgpt/codex-runs";
 
@@ -47,6 +48,14 @@ export class CodexTaskService {
     const manifest = renderManifest(input, prepared);
     const writtenPaths: string[] = [];
     const warnings: string[] = [...prepared.warnings];
+    const promptDecision = evaluatePromptArtifactWrite(prepared.prompt_path, { dry_run: dryRun });
+    const manifestDecision = evaluatePromptArtifactWrite(prepared.manifest_path, { dry_run: dryRun });
+    const approvalSource: ApprovalSource = dryRun
+      ? "dry_run"
+      : promptDecision.allowed && manifestDecision.allowed
+        ? "trusted_prompt_artifact_path"
+        : "explicit_user";
+    const policyWarnings = [...new Set([...promptDecision.warnings, ...manifestDecision.warnings])];
 
     const promptWrite = await this.writer.write({
       path: prepared.prompt_path,
@@ -56,7 +65,7 @@ export class CodexTaskService {
       dry_run: dryRun,
       reason: input.reason
     });
-    warnings.push(...promptWrite.warnings);
+    warnings.push(...promptWrite.warnings, ...policyWarnings);
     if (!dryRun && promptWrite.changed) {
       writtenPaths.push(prepared.prompt_path);
     }
@@ -77,6 +86,7 @@ export class CodexTaskService {
     return {
       ...prepared,
       dry_run: dryRun,
+      approval_source: approvalSource,
       written_paths: writtenPaths,
       warnings
     };

@@ -3,6 +3,7 @@ import { RepoInputSchema } from "./repo.contract.js";
 
 const ExpectedHeadSchema = z.string().regex(/^[a-f0-9]{40}$/).describe("Current 40-character HEAD SHA expected by the caller. The operation is rejected if HEAD changed since review.");
 const GitPathsSchema = z.array(z.string().min(1)).min(1).describe("Explicit repo-relative POSIX paths to operate on. Broad pathspecs, absolute paths, traversal, shell-like paths, Git internals, and hard-risk secret paths are rejected.");
+const ApprovalSourceSchema = z.enum(["explicit_user", "auto_policy", "trusted_prompt_artifact_path", "dry_run", "denied"]).describe("Audit marker explaining whether the operation was explicitly approved, auto-approved by local policy, allowed as a trusted prompt artifact path, validation-only, or denied.");
 
 export const GitStageInputSchema = RepoInputSchema.extend({
   paths: GitPathsSchema,
@@ -65,6 +66,7 @@ const GitOperationDeletedSchema = z.object({
 export const GitStageResultSchema = z.object({
   ok: z.literal(true).describe("True when staging completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not change the git index."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_sha: z.string().describe("HEAD SHA that was verified before staging."),
   staged_paths: z.array(z.string()).describe("Explicit repo-relative paths staged or that would be staged during dry-run."),
   skipped: z.array(GitOperationSkippedSchema).describe("Explicit paths that were not staged and the reason for each skip."),
@@ -74,6 +76,7 @@ export const GitStageResultSchema = z.object({
 export const GitUnstageResultSchema = z.object({
   ok: z.literal(true).describe("True when unstaging completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not change the git index."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_sha: z.string().describe("HEAD SHA that was verified before unstaging."),
   unstaged_paths: z.array(z.string()).describe("Explicit repo-relative paths unstaged or that would be unstaged during dry-run."),
   skipped: z.array(GitOperationSkippedSchema).describe("Explicit paths that were not unstaged and the reason for each skip."),
@@ -83,6 +86,7 @@ export const GitUnstageResultSchema = z.object({
 export const GitRestorePathsResultSchema = z.object({
   ok: z.literal(true).describe("True when restore completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not change worktree files."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_sha: z.string().describe("HEAD SHA that was verified before restoring worktree paths."),
   restored_paths: z.array(z.string()).describe("Explicit repo-relative worktree paths restored or that would be restored during dry-run."),
   skipped: z.array(GitOperationSkippedSchema).describe("Explicit paths that were not restored and the reason for each skip."),
@@ -92,6 +96,7 @@ export const GitRestorePathsResultSchema = z.object({
 export const GitCommitResultSchema = z.object({
   ok: z.literal(true).describe("True when commit completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not create a commit."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_before: z.string().describe("HEAD SHA verified before the commit operation."),
   head_after: z.string().optional().describe("New HEAD SHA after a successful local commit."),
   commit_sha: z.string().optional().describe("SHA of the local commit that was created."),
@@ -102,6 +107,7 @@ export const GitCommitResultSchema = z.object({
 export const GitStageCommitResultSchema = z.object({
   ok: z.literal(true).describe("True when the reviewed stage-and-commit workflow completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not change the git index or create a commit."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_before: z.string().describe("HEAD SHA verified before staging and commit."),
   head_after: z.string().optional().describe("New HEAD SHA after a successful local commit."),
   commit_sha: z.string().optional().describe("SHA of the local commit that was created."),
@@ -115,6 +121,7 @@ export const GitStageCommitResultSchema = z.object({
 export const GitRecoverResultSchema = z.object({
   ok: z.literal(true).describe("True when the reviewed recovery workflow completed or dry-run validation succeeded."),
   dry_run: z.boolean().describe("Whether the request was validation-only and did not mutate the index, worktree, or filesystem."),
+  approval_source: ApprovalSourceSchema.optional(),
   head_sha: z.string().describe("HEAD SHA verified before recovery."),
   unstaged_paths: z.array(z.string()).describe("Explicit repo-relative paths unstaged, or that would be unstaged during dry-run."),
   restored_paths: z.array(z.string()).describe("Explicit repo-relative tracked paths restored, or that would be restored during dry-run."),
