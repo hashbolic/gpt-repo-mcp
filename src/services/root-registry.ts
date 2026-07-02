@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DEFAULT_LIMITS } from "../policies/limits.js";
 import { RepoReaderError } from "../runtime/errors.js";
 import { OperationsPolicyConfigSchema, WritePolicyConfigSchema } from "../config/schema.js";
+import { envPositiveInt, trustedLocalReadsEnabled } from "./trusted-local-policy.js";
 
 const RepoConfigSchema = z.object({
   repo_id: z.string().min(1),
@@ -38,11 +39,7 @@ export class RootRegistry {
     for (const repo of parsed.repos) {
       repos.push({ ...repo, root: await realpath(repo.root) });
     }
-    return new RootRegistry(repos, {
-      max_files: parsed.limits.max_files ?? DEFAULT_LIMITS.max_files,
-      max_bytes_per_file: parsed.limits.max_bytes_per_file ?? DEFAULT_LIMITS.max_bytes_per_file,
-      max_total_bytes: parsed.limits.max_total_bytes ?? DEFAULT_LIMITS.max_total_bytes
-    });
+    return new RootRegistry(repos, resolveLimits(parsed.limits));
   }
 
   static async fromFile(configPath: string): Promise<RootRegistry> {
@@ -65,4 +62,19 @@ export class RootRegistry {
     }
     return repo;
   }
+}
+
+function resolveLimits(configLimits: RepoReaderConfig["limits"]): Required<RepoReaderConfig["limits"]> {
+  const trustedReads = trustedLocalReadsEnabled();
+  return {
+    max_files: configLimits.max_files
+      ?? (trustedReads ? envPositiveInt("GPT_REPO_MCP_MAX_CONTEXT_FILES") : undefined)
+      ?? DEFAULT_LIMITS.max_files,
+    max_bytes_per_file: configLimits.max_bytes_per_file
+      ?? (trustedReads ? envPositiveInt("GPT_REPO_MCP_MAX_CONTEXT_BYTES_PER_FILE") : undefined)
+      ?? DEFAULT_LIMITS.max_bytes_per_file,
+    max_total_bytes: configLimits.max_total_bytes
+      ?? (trustedReads ? envPositiveInt("GPT_REPO_MCP_MAX_RESULT_BYTES") : undefined)
+      ?? DEFAULT_LIMITS.max_total_bytes
+  };
 }
